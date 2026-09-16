@@ -11,7 +11,7 @@ st.set_page_config(page_title="Gestor de Trámites", page_icon="📄", layout="w
 # --- 1. SEGURIDAD ---
 def check_password():
     def password_entered():
-        if st.session_state["password"] == "admin123": 
+        if st.session_state["password"] == "programadorgabriel": 
             st.session_state["password_correct"] = True
             del st.session_state["password"]
         else:
