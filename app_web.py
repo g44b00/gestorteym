@@ -325,66 +325,40 @@ elif menu == "🔍 Buscar / Editar":
                         st.markdown(f"**{key}:** {val}")
                     st.markdown(f"**Notas del Grupo:** {p_data['notas']}")
                     
-                  # --- FASE 2: VISOR INTELIGENTE DE IMÁGENES (CORREGIDO) ---
-                archivos = pd.read_sql(f"SELECT nombre_archivo, tipo_archivo, datos FROM archivos_subidos WHERE id_persona = {id_persona}", conn)
-                if not archivos.empty:
-                    st.markdown("#### 📁 Archivos Adjuntos")
-                    
-                    imagenes = []
-                    otros_archivos = []
-                    
-                    for _, archivo in archivos.iterrows():
-                        if "image" in archivo['tipo_archivo']:
-                            imagenes.append(archivo)
-                        else:
-                            otros_archivos.append(archivo)
-                    
-                    # Mostrar los botones de descarga para PDFs y otros
-                    if otros_archivos:
-                        st.write("📄 Documentos:")
-                        for idx, archivo in enumerate(otros_archivos):
-                            st.download_button(label=f"Descargar {archivo['nombre_archivo']}", data=archivo['datos'], file_name=archivo['nombre_archivo'], mime=archivo['tipo_archivo'], key=f"dl_pdf_{id_persona}_{idx}")
-                    
-                    # Mostrar la Galería para Imágenes
-                    if imagenes:
-                        st.write("🖼️ Galería Visual:")
-                        cols = st.columns(min(len(imagenes), 3))
-                        for idx, img in enumerate(imagenes):
-                            with cols[idx % 3]:
-                                # Envolver los bytes crudos con io.BytesIO para que Streamlit lo lea como imagen
-                                try:
-                                    foto_virtual = io.BytesIO(img['datos'])
-                                    st.image(foto_virtual, caption=img['nombre_archivo'], use_container_width=True)
-                                except Exception:
-                                    st.error("Error al mostrar la imagen.")
-                                    
-                                st.download_button(label="📥 Descargar Foto", data=img['datos'], file_name=img['nombre_archivo'], mime=img['tipo_archivo'], key=f"dl_img_{id_persona}_{idx}")
-                else:
-                    st.warning("Estás en Modo Edición. Guarda los cambios al terminar.")
-                    with st.form(f"form_edit_{id_persona}"):
-                        nuevo_nombre = st.text_input("Nombre:", value=p_data['nombre'])
-                        nuevo_estado = st.selectbox("Estado Trámite:", ["Recibido", "En proceso", "Finalizado", "Rechazado"], index=["Recibido", "En proceso", "Finalizado", "Rechazado"].index(p_data['estado_tramite']))
+                 # --- FASE 2: VISOR INTELIGENTE (TAMAÑO COMPACTO) ---
+                    archivos = pd.read_sql(f"SELECT nombre_archivo, tipo_archivo, datos FROM archivos_subidos WHERE id_persona = {id_persona}", conn)
+                    if not archivos.empty:
+                        st.markdown("#### 📁 Archivos Adjuntos")
                         
-                        nuevo_pago = st.selectbox("Estado Pago:", ["Pendiente", "Pagado"], index=["Pendiente", "Pagado"].index(p_data['estado_pago']))
+                        imagenes = []
+                        otros_archivos = []
                         
-                        nuevos_dinamicos = {}
-                        for key, val in dinamicos_json.items():
-                            if key == "Tipo de certificado":
-                                opciones = ["Antecedentes", "Nacimiento"]
-                                idx = opciones.index(val) if val in opciones else 0
-                                nuevos_dinamicos[key] = st.selectbox("Tipo de certificado:", opciones, index=idx)
+                        for _, archivo in archivos.iterrows():
+                            if "image" in archivo['tipo_archivo']:
+                                imagenes.append(archivo)
                             else:
-                                nuevos_dinamicos[key] = st.text_input(f"{key}:", value=val)
+                                otros_archivos.append(archivo)
                         
-                        if st.form_submit_button("💾 Guardar Cambios"):
-                            cursor = conn.cursor()
-                            cursor.execute("UPDATE registros_personas SET nombre=?, datos_dinamicos=? WHERE id=?", (nuevo_nombre, json.dumps(nuevos_dinamicos), id_persona))
-                            cursor.execute("UPDATE registros_grupo SET estado_tramite=?, estado_pago=? WHERE id_grupo=?", (nuevo_estado, nuevo_pago, p_data['id_grupo']))
-                            conn.commit()
-                            st.session_state[f"editando_{id_persona}"] = False
-                            st.success("Cambios guardados.")
-                            st.rerun()
-    conn.close()
+                        # 1. Documentos y PDFs (Solo botones de descarga)
+                        if otros_archivos:
+                            st.write("📄 Documentos:")
+                            for idx, archivo in enumerate(otros_archivos):
+                                st.download_button(label=f"Descargar {archivo['nombre_archivo']}", data=archivo['datos'], file_name=archivo['nombre_archivo'], mime=archivo['tipo_archivo'], key=f"dl_pdf_{id_persona}_{idx}")
+                        
+                        # 2. Galería de Imágenes (Tamaño pequeño)
+                        if imagenes:
+                            st.write("🖼️ Galería Visual:")
+                            cols = st.columns(min(len(imagenes), 4)) # Ahora caben 4 fotos pequeñas por fila
+                            for idx, img in enumerate(imagenes):
+                                with cols[idx % 4]:
+                                    try:
+                                        foto_virtual = io.BytesIO(img['datos'])
+                                        # Aquí limitamos el ancho de la imagen a 200 píxeles para que no sea gigante
+                                        st.image(foto_virtual, caption=img['nombre_archivo'], width=200)
+                                    except Exception:
+                                        st.error("Error al mostrar la imagen.")
+                                        
+                                    st.download_button(label="📥 Descargar Foto", data=img['datos'], file_name=img['nombre_archivo'], mime=img['tipo_archivo'], key=f"dl_img_{id_persona}_{idx}")
 
 elif menu == "📊 Exportar a Excel":
     st.title("📊 Exportar Datos a Excel (CSV)")
