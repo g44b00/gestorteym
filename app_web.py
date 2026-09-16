@@ -7,6 +7,48 @@ from datetime import datetime
 
 # Configuración visual de la pestaña
 st.set_page_config(page_title="Gestor de Trámites", page_icon="📄", layout="wide")
+# --- ESTILOS VISUALES Y ANIMACIONES (CSS) ---
+estilos_css = """
+<style>
+    /* 1. Agrandar las opciones del menú lateral y prepararlas para animación */
+    [data-testid="stSidebar"] .stRadio label {
+        font-size: 18px !important; /* Letra más grande */
+        padding: 12px 10px !important; /* Más espacio alrededor de la letra */
+        margin-bottom: 5px !important;
+        border-radius: 8px !important;
+        transition: all 0.3s ease-in-out !important; /* Animación fluida */
+        cursor: pointer !important;
+    }
+    
+    /* 2. Efecto HOVER (al pasar el ratón) en el menú lateral */
+    [data-testid="stSidebar"] .stRadio label:hover {
+        transform: scale(1.05) translateX(15px) !important; /* Crece un 5% y se desliza a la derecha */
+        background-color: #f0f8ff !important; /* Fondo azul pastel muy suave */
+        color: #2980B9 !important; /* Letra cambia a azul fuerte */
+        box-shadow: -2px 2px 10px rgba(0,0,0,0.05) !important; /* Sombra sutil */
+    }
+
+    /* 3. Animación para los botones principales (Ej. Guardar Trámite) */
+    .stButton > button {
+        transition: all 0.3s ease !important;
+    }
+    .stButton > button:hover {
+        transform: translateY(-3px) scale(1.02) !important; /* Botón salta hacia arriba un poquito */
+        box-shadow: 0px 5px 15px rgba(0,0,0,0.15) !important; /* Sombra más pronunciada */
+    }
+    
+    /* 4. Animación para las casillas de texto al hacerles clic */
+    .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] {
+        transition: all 0.3s ease !important;
+    }
+    .stTextInput input:focus, .stTextArea textarea:focus, .stSelectbox div[data-baseweb="select"]:focus-within {
+        transform: scale(1.01) !important; /* Crece microscópicamente */
+        border-color: #3498DB !important; /* Borde azul */
+        box-shadow: 0px 0px 8px rgba(52, 152, 219, 0.4) !important; /* Resplandor azul */
+    }
+</style>
+"""
+st.markdown(estilos_css, unsafe_allow_html=True)
 
 # --- 1. SEGURIDAD ---
 def check_password():
