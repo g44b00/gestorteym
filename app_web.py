@@ -7,25 +7,30 @@ from datetime import datetime
 
 # Configuración visual de la pestaña
 st.set_page_config(page_title="Gestor de Trámites", page_icon="📄", layout="wide")
-# --- ESTILOS VISUALES Y ANIMACIONES (CSS) ---
+# --- ESTILOS VISUALES Y ANIMACIONES (CSS MEJORADO) ---
 estilos_css = """
 <style>
-    /* 1. Agrandar las opciones del menú lateral y prepararlas para animación */
+    /* 1. Opciones del menú lateral mucho más grandes y anchas */
     [data-testid="stSidebar"] .stRadio label {
-        font-size: 18px !important; /* Letra más grande */
-        padding: 12px 10px !important; /* Más espacio alrededor de la letra */
-        margin-bottom: 5px !important;
-        border-radius: 8px !important;
-        transition: all 0.3s ease-in-out !important; /* Animación fluida */
+        font-size: 22px !important; /* Letra grande y destacada */
+        padding: 16px 14px !important; /* Mayor área de clic (ideal para celular) */
+        margin-bottom: 10px !important;
+        border-radius: 12px !important;
+        transition: all 0.3s ease-in-out !important;
         cursor: pointer !important;
     }
     
-    /* 2. Efecto HOVER (al pasar el ratón) en el menú lateral */
+    /* Asegurar que el texto interno también tome el tamaño grande */
+    [data-testid="stSidebar"] .stRadio label p {
+        font-size: 22px !important;
+    }
+    
+    /* 2. Efecto HOVER (al pasar el ratón o el dedo) */
     [data-testid="stSidebar"] .stRadio label:hover {
-        transform: scale(1.05) translateX(15px) !important; /* Crece un 5% y se desliza a la derecha */
-        background-color: #f0f8ff !important; /* Fondo azul pastel muy suave */
-        color: #2980B9 !important; /* Letra cambia a azul fuerte */
-        box-shadow: -2px 2px 10px rgba(0,0,0,0.05) !important; /* Sombra sutil */
+        transform: scale(1.06) translateX(15px) !important; /* Crece un 6% y se desliza */
+        background-color: #f0f8ff !important;
+        color: #2980B9 !important;
+        box-shadow: -2px 4px 15px rgba(0,0,0,0.1) !important;
     }
 
     /* 3. Animación para los botones principales (Ej. Guardar Trámite) */
@@ -33,8 +38,8 @@ estilos_css = """
         transition: all 0.3s ease !important;
     }
     .stButton > button:hover {
-        transform: translateY(-3px) scale(1.02) !important; /* Botón salta hacia arriba un poquito */
-        box-shadow: 0px 5px 15px rgba(0,0,0,0.15) !important; /* Sombra más pronunciada */
+        transform: translateY(-3px) scale(1.02) !important;
+        box-shadow: 0px 5px 15px rgba(0,0,0,0.15) !important;
     }
     
     /* 4. Animación para las casillas de texto al hacerles clic */
@@ -42,9 +47,9 @@ estilos_css = """
         transition: all 0.3s ease !important;
     }
     .stTextInput input:focus, .stTextArea textarea:focus, .stSelectbox div[data-baseweb="select"]:focus-within {
-        transform: scale(1.01) !important; /* Crece microscópicamente */
-        border-color: #3498DB !important; /* Borde azul */
-        box-shadow: 0px 0px 8px rgba(52, 152, 219, 0.4) !important; /* Resplandor azul */
+        transform: scale(1.01) !important;
+        border-color: #3498DB !important;
+        box-shadow: 0px 0px 8px rgba(52, 152, 219, 0.4) !important;
     }
 </style>
 """
