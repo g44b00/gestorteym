@@ -36,7 +36,7 @@ st.markdown(estilos_css, unsafe_allow_html=True)
 # --- 1. SEGURIDAD ---
 def check_password():
     def password_entered():
-        if st.session_state["password"] == "MisTramites2026": 
+        if st.session_state["password"] == "Local2014": 
             st.session_state["password_correct"] = True
             del st.session_state["password"]
         else:
