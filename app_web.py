@@ -7,52 +7,51 @@ from datetime import datetime
 
 # Configuración visual de la pestaña
 st.set_page_config(page_title="Gestor de Trámites", page_icon="📄", layout="wide")
-# --- ESTILOS VISUALES Y DISEÑO PROPORCIONAL (CSS) ---
+# --- ESTILOS VISUALES Y TAMAÑOS AMPLIADOS (CSS) ---
 estilos_css = """
 <style>
-    /* 1. Opciones del menú lateral grandes y animadas */
+    /* 1. Opciones del menú lateral gigantescas y cómodas */
     [data-testid="stSidebar"] .stRadio label {
-        font-size: 22px !important;
-        padding: 16px 14px !important;
-        margin-bottom: 10px !important;
+        font-size: 24px !important;
+        padding: 18px 16px !important;
+        margin-bottom: 12px !important;
         border-radius: 12px !important;
         transition: all 0.3s ease-in-out !important;
         cursor: pointer !important;
     }
     [data-testid="stSidebar"] .stRadio label p {
-        font-size: 22px !important;
+        font-size: 24px !important;
     }
     [data-testid="stSidebar"] .stRadio label:hover {
         transform: scale(1.06) translateX(15px) !important;
-        background-color: #f0f8ff !important;
-        color: #2980B9 !important;
+        background-color: rgba(52, 152, 219, 0.15) !important;
+        color: #3498DB !important;
         box-shadow: -2px 4px 15px rgba(0,0,0,0.1) !important;
     }
 
-    /* 2. Etiquetas de los formularios más grandes y claras */
-    label, .stSelectbox label, .stTextInput label, .stTextArea label {
-        font-size: 18px !important;
+    /* 2. Etiquetas de los formularios mucho más grandes (Se adaptan automáticamente a Modo Claro u Oscuro) */
+    label, .stSelectbox label, .stTextInput label, .stTextArea label, p {
+        font-size: 20px !important;
         font-weight: 600 !important;
-        color: #2C3E50 !important;
     }
 
-    /* 3. Control de ancho: Evitar que los recuadros sean exageradamente largos */
+    /* 3. Control de ancho proporcionado */
     .stTextInput, .stSelectbox, .stTextArea {
-        max-width: 600px !important; /* Ancho máximo ideal para que se vea ordenado y proporcional */
+        max-width: 650px !important;
     }
 
-    /* Agrandar la letra y espacio interno de las casillas de texto */
+    /* Agrandar la letra interna de las casillas de texto y selectores */
     .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] {
-        font-size: 16px !important;
-        padding: 8px 12px !important;
+        font-size: 18px !important;
+        padding: 10px 14px !important;
         border-radius: 8px !important;
     }
 
-    /* 4. Botones principales proporcionales y con animación de movimiento */
+    /* 4. Botones principales grandes, proporcionales y con animación */
     .stButton > button {
-        font-size: 18px !important;
+        font-size: 20px !important;
         font-weight: 600 !important;
-        padding: 10px 24px !important;
+        padding: 12px 28px !important;
         border-radius: 8px !important;
         transition: all 0.3s ease !important;
     }
@@ -60,16 +59,9 @@ estilos_css = """
         transform: translateY(-3px) scale(1.02) !important;
         box-shadow: 0px 5px 15px rgba(0,0,0,0.15) !important;
     }
-    
-    /* Animación sutil al hacer clic en los campos */
-    .stTextInput input:focus, .stTextArea textarea:focus {
-        border-color: #3498DB !important;
-        box-shadow: 0px 0px 8px rgba(52, 152, 219, 0.4) !important;
-    }
 </style>
 """
 st.markdown(estilos_css, unsafe_allow_html=True)
-
 # --- 1. SEGURIDAD ---
 def check_password():
     def password_entered():
