@@ -197,7 +197,8 @@ elif menu == "🔍 Buscar / Editar":
     st.write("Selecciona una o varias filas usando las casillas de la izquierda.")
     conn = get_db_connection()
     
-    query = '''SELECT p.id, p.nombre as Nombre, g.tipo_tramite as Trámite, g.fecha as Fecha, g.monto as Monto, p.datos_dinamicos FROM registros_personas p JOIN registros_grupo g ON p.id_grupo = g.id_grupo'''
+    # 1. Traer la columna estado_pago de la base de datos
+    query = '''SELECT p.id, p.nombre as Nombre, g.tipo_tramite as Trámite, g.fecha as Fecha, g.monto as Monto, g.estado_pago as Pago, p.datos_dinamicos FROM registros_personas p JOIN registros_grupo g ON p.id_grupo = g.id_grupo'''
     df_busqueda = pd.read_sql(query, conn)
     
     if not df_busqueda.empty:
@@ -207,33 +208,28 @@ elif menu == "🔍 Buscar / Editar":
         if buscar:
             df_busqueda = df_busqueda[df_busqueda['Nombre'].str.contains(buscar, case=False, na=False)]
         
-        columnas_mostrar = ['Nombre', 'Tipo de Certificado', 'Trámite', 'Fecha', 'Monto']
+        # 2. Agregar la columna "Pago" a la vista principal
+        columnas_mostrar = ['Nombre', 'Tipo de Certificado', 'Trámite', 'Fecha', 'Monto', 'Pago']
         df_mostrar = df_busqueda[['id'] + columnas_mostrar]
         
-        # --- AQUÍ CAMBIAMOS A SELECCIÓN MÚLTIPLE (multi-row) ---
         event = st.dataframe(df_mostrar, column_config={"id": None}, on_select="rerun", selection_mode="multi-row", use_container_width=True, hide_index=True)
         
         if event.selection.rows:
-            # Obtener todos los IDs seleccionados
             filas_seleccionadas = event.selection.rows
             ids_seleccionados = [int(df_mostrar.iloc[i]['id']) for i in filas_seleccionadas]
             
             st.divider()
             
-            # --- ZONA DE ELIMINACIÓN (Visible siempre que haya 1 o más seleccionados) ---
             st.error(f"⚠️ Has seleccionado {len(ids_seleccionados)} persona(s).")
             if st.button("🗑️ Eliminar Seleccionados", type="primary"):
                 cursor = conn.cursor()
                 placeholders = ','.join('?' for _ in ids_seleccionados)
-                # Borrar archivos asociados
                 cursor.execute(f"DELETE FROM archivos_subidos WHERE id_persona IN ({placeholders})", ids_seleccionados)
-                # Borrar personas
                 cursor.execute(f"DELETE FROM registros_personas WHERE id IN ({placeholders})", ids_seleccionados)
                 conn.commit()
                 st.success("¡Registros eliminados correctamente!")
                 st.rerun()
 
-            # --- MODO DETALLE/EDICIÓN (Visible SOLO si hay exactamente 1 seleccionado) ---
             if len(ids_seleccionados) == 1:
                 id_persona = ids_seleccionados[0]
                 p_data = pd.read_sql(f"SELECT p.*, g.* FROM registros_personas p JOIN registros_grupo g ON p.id_grupo = g.id_grupo WHERE p.id = {id_persona}", conn).iloc[0]
@@ -271,6 +267,9 @@ elif menu == "🔍 Buscar / Editar":
                         nuevo_nombre = st.text_input("Nombre:", value=p_data['nombre'])
                         nuevo_estado = st.selectbox("Estado Trámite:", ["Recibido", "En proceso", "Finalizado", "Rechazado"], index=["Recibido", "En proceso", "Finalizado", "Rechazado"].index(p_data['estado_tramite']))
                         
+                        # 3. Se agregó el campo para editar el estado del pago
+                        nuevo_pago = st.selectbox("Estado Pago:", ["Pendiente", "Pagado"], index=["Pendiente", "Pagado"].index(p_data['estado_pago']))
+                        
                         nuevos_dinamicos = {}
                         for key, val in dinamicos_json.items():
                             if key == "Tipo de certificado":
@@ -283,7 +282,8 @@ elif menu == "🔍 Buscar / Editar":
                         if st.form_submit_button("💾 Guardar Cambios"):
                             cursor = conn.cursor()
                             cursor.execute("UPDATE registros_personas SET nombre=?, datos_dinamicos=? WHERE id=?", (nuevo_nombre, json.dumps(nuevos_dinamicos), id_persona))
-                            cursor.execute("UPDATE registros_grupo SET estado_tramite=? WHERE id_grupo=?", (nuevo_estado, p_data['id_grupo']))
+                            # Ahora guardamos también el estado del pago al editar
+                            cursor.execute("UPDATE registros_grupo SET estado_tramite=?, estado_pago=? WHERE id_grupo=?", (nuevo_estado, nuevo_pago, p_data['id_grupo']))
                             conn.commit()
                             st.session_state[f"editando_{id_persona}"] = False
                             st.success("Cambios guardados.")
