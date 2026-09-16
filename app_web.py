@@ -10,14 +10,31 @@ st.set_page_config(page_title="Gestor de Trámites", page_icon="📄", layout="w
 
 estilos_css = """
 <style>
+    /* Menú Lateral */
     [data-testid="stSidebar"] .stRadio label { font-size: 24px !important; padding: 18px 16px !important; margin-bottom: 12px !important; border-radius: 12px !important; transition: all 0.3s ease-in-out !important; cursor: pointer !important; }
     [data-testid="stSidebar"] .stRadio label p { font-size: 24px !important; }
     [data-testid="stSidebar"] .stRadio label:hover { transform: scale(1.06) translateX(15px) !important; background-color: rgba(52, 152, 219, 0.15) !important; color: #3498DB !important; box-shadow: -2px 4px 15px rgba(0,0,0,0.1) !important; }
+    
+    /* Textos Generales y Controles */
     label, .stSelectbox label, .stTextInput label, .stTextArea label, p { font-size: 20px !important; font-weight: 600 !important; }
     .stTextInput, .stSelectbox, .stTextArea { max-width: 650px !important; }
     .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] { font-size: 18px !important; padding: 10px 14px !important; border-radius: 8px !important; }
+    
+    /* Botones */
     .stButton > button { font-size: 20px !important; font-weight: 600 !important; padding: 12px 28px !important; border-radius: 8px !important; transition: all 0.3s ease !important; }
     .stButton > button:hover { transform: translateY(-3px) scale(1.02) !important; box-shadow: 0px 5px 15px rgba(0,0,0,0.15) !important; }
+    
+    /* Tarjetas del Dashboard */
+    .metric-card {
+        background-color: #f8f9fa;
+        border-left: 6px solid #3498DB;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0px 4px 6px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
+    }
+    .metric-card h3 { margin: 0; color: #7f8c8d; font-size: 18px; }
+    .metric-card h2 { margin: 5px 0 0 0; color: #2c3e50; font-size: 36px; }
 </style>
 """
 st.markdown(estilos_css, unsafe_allow_html=True)
@@ -25,7 +42,7 @@ st.markdown(estilos_css, unsafe_allow_html=True)
 # --- 1. SEGURIDAD ---
 def check_password():
     def password_entered():
-        if st.session_state["password"] == "12916": 
+        if st.session_state["password"] == "MisTramites2026": 
             st.session_state["password_correct"] = True
             del st.session_state["password"]
         else:
@@ -70,11 +87,56 @@ init_db()
 
 # --- 3. MENÚ LATERAL ---
 st.sidebar.title("📄 Gestor Documental")
-menu = st.sidebar.radio("Navegación", ["📝 Nuevo Registro", "🔍 Buscar / Editar", "📊 Exportar a Excel", "⚙️ Configuración"])
+menu = st.sidebar.radio("Navegación", ["🏠 Dashboard Inicial", "📝 Nuevo Registro", "🔍 Buscar / Editar", "📊 Exportar a Excel", "⚙️ Configuración"])
 
 # --- 4. SECCIONES ---
 
-if menu == "⚙️ Configuración":
+if menu == "🏠 Dashboard Inicial":
+    st.title("🏠 Panel de Control")
+    conn = get_db_connection()
+    
+    # Cálculos para el Dashboard
+    df_dashboard = pd.read_sql("SELECT monto, estado_pago, tipo_tramite, fecha FROM registros_grupo", conn)
+    
+    # Limpiar montos (quitar el signo $ y puntos para poder sumar matemáticamente)
+    def limpiar_monto(valor):
+        try:
+            return int(str(valor).replace('$', '').replace('.', '').replace(' ', '').strip())
+        except:
+            return 0
+            
+    if not df_dashboard.empty:
+        df_dashboard['monto_num'] = df_dashboard['monto'].apply(limpiar_monto)
+        
+        ingresos_totales = df_dashboard[df_dashboard['estado_pago'] == 'Pagado']['monto_num'].sum()
+        dinero_pendiente = df_dashboard[df_dashboard['estado_pago'] == 'Pendiente']['monto_num'].sum()
+        total_tramites = len(df_dashboard)
+        
+        # Formatear números como CLP
+        formato_ingreso = f"${ingresos_totales:,.0f}".replace(",", ".")
+        formato_pendiente = f"${dinero_pendiente:,.0f}".replace(",", ".")
+        
+        # Mostrar Tarjetas (Cards)
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.markdown(f"<div class='metric-card'><h3>💰 Ingresos Pagados</h3><h2>{formato_ingreso}</h2></div>", unsafe_allow_html=True)
+        with col2:
+            st.markdown(f"<div class='metric-card' style='border-left-color: #E74C3C;'><h3>⏳ Dinero Pendiente</h3><h2>{formato_pendiente}</h2></div>", unsafe_allow_html=True)
+        with col3:
+            st.markdown(f"<div class='metric-card' style='border-left-color: #2ECC71;'><h3>📄 Total Trámites</h3><h2>{total_tramites}</h2></div>", unsafe_allow_html=True)
+        
+        st.divider()
+        
+        # Gráfico simple de Trámites
+        st.subheader("Distribución de Trámites")
+        conteo_tramites = df_dashboard['tipo_tramite'].value_counts()
+        st.bar_chart(conteo_tramites, use_container_width=True)
+        
+    else:
+        st.info("Aún no hay trámites registrados. El panel de control se poblará cuando agregues datos.")
+    conn.close()
+
+elif menu == "⚙️ Configuración":
     st.title("⚙️ Configuración del Sistema")
     conn = get_db_connection()
     
@@ -136,7 +198,7 @@ elif menu == "📝 Nuevo Registro":
         
         with col1:
             st.subheader("Datos del Grupo")
-            monto = st.text_input("Monto Total (CLP):", placeholder="$ 50000")
+            monto = st.text_input("Monto Total (CLP):", placeholder="Ej: 50000")
             estado_t = st.selectbox("Estado del Trámite:", ["Recibido", "En proceso", "Finalizado", "Rechazado"])
             estado_p = st.selectbox("Estado de Pago:", ["Pendiente", "Pagado"])
             notas = st.text_area("Notas / Observaciones:", height=150)
@@ -197,18 +259,24 @@ elif menu == "🔍 Buscar / Editar":
     st.write("Selecciona una o varias filas usando las casillas de la izquierda.")
     conn = get_db_connection()
     
-    # 1. Traer la columna estado_pago de la base de datos
     query = '''SELECT p.id, p.nombre as Nombre, g.tipo_tramite as Trámite, g.fecha as Fecha, g.monto as Monto, g.estado_pago as Pago, p.datos_dinamicos FROM registros_personas p JOIN registros_grupo g ON p.id_grupo = g.id_grupo'''
     df_busqueda = pd.read_sql(query, conn)
     
     if not df_busqueda.empty:
         df_busqueda['Tipo de Certificado'] = df_busqueda['datos_dinamicos'].apply(lambda x: json.loads(x).get('Tipo de certificado', '-') if pd.notnull(x) else '-')
         
+        # APLICAR INSIGNIAS (EMOJIS/COLORES) A LA COLUMNA PAGO
+        def formato_pago(val):
+            if val == "Pagado":
+                return "✅ Pagado"
+            return "🔴 Pendiente"
+            
+        df_busqueda['Pago'] = df_busqueda['Pago'].apply(formato_pago)
+        
         buscar = st.text_input("🔎 Buscar por nombre:")
         if buscar:
             df_busqueda = df_busqueda[df_busqueda['Nombre'].str.contains(buscar, case=False, na=False)]
         
-        # 2. Agregar la columna "Pago" a la vista principal
         columnas_mostrar = ['Nombre', 'Tipo de Certificado', 'Trámite', 'Fecha', 'Monto', 'Pago']
         df_mostrar = df_busqueda[['id'] + columnas_mostrar]
         
@@ -267,7 +335,6 @@ elif menu == "🔍 Buscar / Editar":
                         nuevo_nombre = st.text_input("Nombre:", value=p_data['nombre'])
                         nuevo_estado = st.selectbox("Estado Trámite:", ["Recibido", "En proceso", "Finalizado", "Rechazado"], index=["Recibido", "En proceso", "Finalizado", "Rechazado"].index(p_data['estado_tramite']))
                         
-                        # 3. Se agregó el campo para editar el estado del pago
                         nuevo_pago = st.selectbox("Estado Pago:", ["Pendiente", "Pagado"], index=["Pendiente", "Pagado"].index(p_data['estado_pago']))
                         
                         nuevos_dinamicos = {}
@@ -282,7 +349,6 @@ elif menu == "🔍 Buscar / Editar":
                         if st.form_submit_button("💾 Guardar Cambios"):
                             cursor = conn.cursor()
                             cursor.execute("UPDATE registros_personas SET nombre=?, datos_dinamicos=? WHERE id=?", (nuevo_nombre, json.dumps(nuevos_dinamicos), id_persona))
-                            # Ahora guardamos también el estado del pago al editar
                             cursor.execute("UPDATE registros_grupo SET estado_tramite=?, estado_pago=? WHERE id_grupo=?", (nuevo_estado, nuevo_pago, p_data['id_grupo']))
                             conn.commit()
                             st.session_state[f"editando_{id_persona}"] = False
@@ -308,4 +374,4 @@ elif menu == "📊 Exportar a Excel":
             
         df_limpio = pd.DataFrame(lista_final)
         csv = df_limpio.to_csv(index=False, sep=";").encode('utf-8-sig')
-        st.download_button(label="📥 Descargar Base de Datos Completa", data=csv, file_name=f"Reporte_Tramites.csv", mime="text/csv", type="primary")
+        st.download_button(label="📥 Descargar Base de Datos Completa", data=csv, file_name=f"Reporte_Tramites_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv", type="primary")
