@@ -7,34 +7,53 @@ from datetime import datetime
 
 # Configuración visual de la pestaña
 st.set_page_config(page_title="Gestor de Trámites", page_icon="📄", layout="wide")
-# --- ESTILOS VISUALES Y ANIMACIONES (CSS MEJORADO) ---
+# --- ESTILOS VISUALES Y DISEÑO PROPORCIONAL (CSS) ---
 estilos_css = """
 <style>
-    /* 1. Opciones del menú lateral mucho más grandes y anchas */
+    /* 1. Opciones del menú lateral grandes y animadas */
     [data-testid="stSidebar"] .stRadio label {
-        font-size: 22px !important; /* Letra grande y destacada */
-        padding: 16px 14px !important; /* Mayor área de clic (ideal para celular) */
+        font-size: 22px !important;
+        padding: 16px 14px !important;
         margin-bottom: 10px !important;
         border-radius: 12px !important;
         transition: all 0.3s ease-in-out !important;
         cursor: pointer !important;
     }
-    
-    /* Asegurar que el texto interno también tome el tamaño grande */
     [data-testid="stSidebar"] .stRadio label p {
         font-size: 22px !important;
     }
-    
-    /* 2. Efecto HOVER (al pasar el ratón o el dedo) */
     [data-testid="stSidebar"] .stRadio label:hover {
-        transform: scale(1.06) translateX(15px) !important; /* Crece un 6% y se desliza */
+        transform: scale(1.06) translateX(15px) !important;
         background-color: #f0f8ff !important;
         color: #2980B9 !important;
         box-shadow: -2px 4px 15px rgba(0,0,0,0.1) !important;
     }
 
-    /* 3. Animación para los botones principales (Ej. Guardar Trámite) */
+    /* 2. Etiquetas de los formularios más grandes y claras */
+    label, .stSelectbox label, .stTextInput label, .stTextArea label {
+        font-size: 18px !important;
+        font-weight: 600 !important;
+        color: #2C3E50 !important;
+    }
+
+    /* 3. Control de ancho: Evitar que los recuadros sean exageradamente largos */
+    .stTextInput, .stSelectbox, .stTextArea {
+        max-width: 600px !important; /* Ancho máximo ideal para que se vea ordenado y proporcional */
+    }
+
+    /* Agrandar la letra y espacio interno de las casillas de texto */
+    .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] {
+        font-size: 16px !important;
+        padding: 8px 12px !important;
+        border-radius: 8px !important;
+    }
+
+    /* 4. Botones principales proporcionales y con animación de movimiento */
     .stButton > button {
+        font-size: 18px !important;
+        font-weight: 600 !important;
+        padding: 10px 24px !important;
+        border-radius: 8px !important;
         transition: all 0.3s ease !important;
     }
     .stButton > button:hover {
@@ -42,12 +61,8 @@ estilos_css = """
         box-shadow: 0px 5px 15px rgba(0,0,0,0.15) !important;
     }
     
-    /* 4. Animación para las casillas de texto al hacerles clic */
-    .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] {
-        transition: all 0.3s ease !important;
-    }
-    .stTextInput input:focus, .stTextArea textarea:focus, .stSelectbox div[data-baseweb="select"]:focus-within {
-        transform: scale(1.01) !important;
+    /* Animación sutil al hacer clic en los campos */
+    .stTextInput input:focus, .stTextArea textarea:focus {
         border-color: #3498DB !important;
         box-shadow: 0px 0px 8px rgba(52, 152, 219, 0.4) !important;
     }
