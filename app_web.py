@@ -324,11 +324,37 @@ elif menu == "🔍 Buscar / Editar":
                         st.markdown(f"**{key}:** {val}")
                     st.markdown(f"**Notas del Grupo:** {p_data['notas']}")
                     
+                    # --- FASE 2: VISOR INTELIGENTE DE ARCHIVOS ---
                     archivos = pd.read_sql(f"SELECT nombre_archivo, tipo_archivo, datos FROM archivos_subidos WHERE id_persona = {id_persona}", conn)
                     if not archivos.empty:
                         st.markdown("#### 📁 Archivos Adjuntos")
+                        
+                        # Separar imágenes de PDFs
+                        imagenes = []
+                        otros_archivos = []
+                        
                         for _, archivo in archivos.iterrows():
-                            st.download_button(label=f"Descargar {archivo['nombre_archivo']}", data=archivo['datos'], file_name=archivo['nombre_archivo'], mime=archivo['tipo_archivo'])
+                            if "image" in archivo['tipo_archivo']:
+                                imagenes.append(archivo)
+                            else:
+                                otros_archivos.append(archivo)
+                        
+                        # Mostrar los botones de descarga para PDFs y otros
+                        if otros_archivos:
+                            st.write("📄 Documentos:")
+                            for archivo in otros_archivos:
+                                st.download_button(label=f"Descargar {archivo['nombre_archivo']}", data=archivo['datos'], file_name=archivo['nombre_archivo'], mime=archivo['tipo_archivo'], key=f"dl_pdf_{id_persona}_{archivo['nombre_archivo']}")
+                        
+                        # Mostrar la Galería para Imágenes
+                        if imagenes:
+                            st.write("🖼️ Galería Visual:")
+                            # Crear columnas para mostrar imágenes lado a lado (máximo 3 por fila)
+                            cols = st.columns(min(len(imagenes), 3))
+                            for idx, img in enumerate(imagenes):
+                                with cols[idx % 3]:
+                                    st.image(img['datos'], caption=img['nombre_archivo'], use_column_width=True)
+                                    # El botón de descarga sigue estando abajo de la imagen por si acaso
+                                    st.download_button(label="📥 Descargar", data=img['datos'], file_name=img['nombre_archivo'], mime=img['tipo_archivo'], key=f"dl_img_{id_persona}_{img['nombre_archivo']}_{idx}")
                 else:
                     st.warning("Estás en Modo Edición. Guarda los cambios al terminar.")
                     with st.form(f"form_edit_{id_persona}"):
