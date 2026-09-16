@@ -25,7 +25,7 @@ st.markdown(estilos_css, unsafe_allow_html=True)
 # --- 1. SEGURIDAD ---
 def check_password():
     def password_entered():
-        if st.session_state["password"] == "gestorlocal": 
+        if st.session_state["password"] == "MisTramites2026": 
             st.session_state["password_correct"] = True
             del st.session_state["password"]
         else:
@@ -55,7 +55,6 @@ def init_db():
     cursor.execute('''CREATE TABLE IF NOT EXISTS config_tramites (nombre TEXT PRIMARY KEY, campos JSON)''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS registros_grupo (id_grupo TEXT PRIMARY KEY, tipo_tramite TEXT, fecha TEXT, monto TEXT, estado_tramite TEXT, estado_pago TEXT, notas TEXT)''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS registros_personas (id INTEGER PRIMARY KEY AUTOINCREMENT, id_grupo TEXT, es_titular INTEGER, nombre TEXT, datos_dinamicos JSON, documentos TEXT)''')
-    # Nueva tabla para los archivos
     cursor.execute('''CREATE TABLE IF NOT EXISTS archivos_subidos (id INTEGER PRIMARY KEY AUTOINCREMENT, id_persona INTEGER, nombre_archivo TEXT, tipo_archivo TEXT, datos BLOB)''')
     
     cursor.execute("SELECT count(*) FROM config_tramites")
@@ -147,7 +146,6 @@ elif menu == "📝 Nuevo Registro":
         with col2:
             st.subheader("Personas y Archivos")
             datos_personas = []
-            archivos_por_persona = {}
             
             with st.form("form_registro", clear_on_submit=True):
                 for i in range(num_personas):
@@ -158,21 +156,17 @@ elif menu == "📝 Nuevo Registro":
                     nombre = st.text_input(f"Nombre Completo:", key=f"nom_{i}")
                     dinamicos = {}
                     
-                    # LOGICA ESPECIAL LEGALIZACION
                     if tipo_tramite == "Legalización" and es_titular:
                         dinamicos["Tipo de certificado"] = st.selectbox("Tipo de certificado:", ["Antecedentes", "Nacimiento"], key=f"cert_{i}")
                     
                     for campo in campos_dinamicos:
                         dinamicos[campo] = st.text_input(f"{campo}:", key=f"din_{i}_{campo}")
                     
-                    # LOGICA ESPECIAL DOCUMENTOS (Ocultar en legalización)
                     docs = ""
                     if tipo_tramite != "Legalización":
                         docs = st.text_area(f"Documentos Físicos Recibidos:", value="Ninguno", key=f"doc_{i}")
                     
-                    # SUBIDA DE ARCHIVOS
-                    archivos = st.file_uploader(f"Subir archivos digitales para {rol} (PDF, JPG, PNG)", type=["pdf", "png", "jpg"], accept_multiple_files=True, key=f"file_{i}")
-                    
+                    archivos = st.file_uploader(f"Subir archivos (PDF, JPG, PNG)", type=["pdf", "png", "jpg"], accept_multiple_files=True, key=f"file_{i}")
                     datos_personas.append({"es_titular": 1 if es_titular else 0, "nombre": nombre, "dinamicos": dinamicos, "documentos": docs, "archivos": archivos})
                     st.divider()
                     
@@ -185,110 +179,115 @@ elif menu == "📝 Nuevo Registro":
                         id_grupo = str(uuid.uuid4())[:8]
                         fecha_actual = datetime.now().strftime("%d/%m/%Y")
                         cursor = conn.cursor()
-                        
                         cursor.execute('''INSERT INTO registros_grupo (id_grupo, tipo_tramite, fecha, monto, estado_tramite, estado_pago, notas) VALUES (?, ?, ?, ?, ?, ?, ?)''', (id_grupo, tipo_tramite, fecha_actual, monto, estado_t, estado_p, notas))
                         
                         for p in datos_personas:
                             if p["nombre"].strip():
                                 cursor.execute('''INSERT INTO registros_personas (id_grupo, es_titular, nombre, datos_dinamicos, documentos) VALUES (?, ?, ?, ?, ?)''', (id_grupo, p["es_titular"], p["nombre"], json.dumps(p["dinamicos"]), p["documentos"]))
                                 person_id = cursor.lastrowid
-                                
-                                # Guardar Archivos en la Base de Datos
                                 if p["archivos"]:
                                     for arch in p["archivos"]:
                                         cursor.execute("INSERT INTO archivos_subidos (id_persona, nombre_archivo, tipo_archivo, datos) VALUES (?, ?, ?, ?)", (person_id, arch.name, arch.type, arch.read()))
-                        
                         conn.commit()
                         st.success("¡Registro guardado con archivos en la nube!")
     conn.close()
 
 elif menu == "🔍 Buscar / Editar":
-    st.title("🔍 Buscador (Haz clic en una fila para ver más)")
+    st.title("🔍 Buscador de Trámites")
+    st.write("Selecciona una o varias filas usando las casillas de la izquierda.")
     conn = get_db_connection()
     
-    # Construir la tabla con las columnas solicitadas
     query = '''SELECT p.id, p.nombre as Nombre, g.tipo_tramite as Trámite, g.fecha as Fecha, g.monto as Monto, p.datos_dinamicos FROM registros_personas p JOIN registros_grupo g ON p.id_grupo = g.id_grupo'''
     df_busqueda = pd.read_sql(query, conn)
     
     if not df_busqueda.empty:
-        # Extraer "Tipo de certificado" dinámicamente para la columna
         df_busqueda['Tipo de Certificado'] = df_busqueda['datos_dinamicos'].apply(lambda x: json.loads(x).get('Tipo de certificado', '-') if pd.notnull(x) else '-')
         
-        # Filtro de búsqueda manual
         buscar = st.text_input("🔎 Buscar por nombre:")
         if buscar:
             df_busqueda = df_busqueda[df_busqueda['Nombre'].str.contains(buscar, case=False, na=False)]
         
-        # Mostrar solo las columnas requeridas (ocultando el ID y los JSON)
         columnas_mostrar = ['Nombre', 'Tipo de Certificado', 'Trámite', 'Fecha', 'Monto']
         df_mostrar = df_busqueda[['id'] + columnas_mostrar]
         
-        # La tabla interactiva (on_select="rerun" permite saber en qué fila hizo clic)
-        event = st.dataframe(df_mostrar, column_config={"id": None}, on_select="rerun", selection_mode="single-row", use_container_width=True, hide_index=True)
+        # --- AQUÍ CAMBIAMOS A SELECCIÓN MÚLTIPLE (multi-row) ---
+        event = st.dataframe(df_mostrar, column_config={"id": None}, on_select="rerun", selection_mode="multi-row", use_container_width=True, hide_index=True)
         
         if event.selection.rows:
-            # Obtener el ID de la persona seleccionada
-            fila_seleccionada = event.selection.rows[0]
-            id_persona = int(df_mostrar.iloc[fila_seleccionada]['id'])
-            
-            # Buscar TODOS sus datos
-            p_data = pd.read_sql(f"SELECT p.*, g.* FROM registros_personas p JOIN registros_grupo g ON p.id_grupo = g.id_grupo WHERE p.id = {id_persona}", conn).iloc[0]
-            dinamicos_json = json.loads(p_data['datos_dinamicos'])
+            # Obtener todos los IDs seleccionados
+            filas_seleccionadas = event.selection.rows
+            ids_seleccionados = [int(df_mostrar.iloc[i]['id']) for i in filas_seleccionadas]
             
             st.divider()
-            colA, colB = st.columns([9, 1])
-            colA.subheader(f"📋 Detalles de: {p_data['nombre']}")
             
-            # Botón Lápiz para activar edición
-            if colB.button("✏️ Editar", type="secondary"):
-                st.session_state[f"editando_{id_persona}"] = not st.session_state.get(f"editando_{id_persona}", False)
-            
-            edit_mode = st.session_state.get(f"editando_{id_persona}", False)
-            
-            if not edit_mode:
-                # --- MODO SOLO LECTURA ---
-                col1, col2 = st.columns(2)
-                col1.markdown(f"**Trámite:** {p_data['tipo_tramite']} - {p_data['estado_tramite']}")
-                col1.markdown(f"**Monto:** {p_data['monto']} ({p_data['estado_pago']})")
-                col2.markdown(f"**Rol:** {'Titular' if p_data['es_titular']==1 else 'Adicional'}")
-                if p_data['documentos']: col2.markdown(f"**Docs Físicos:** {p_data['documentos']}")
-                
-                st.markdown("#### Datos de la Casilla")
-                for key, val in dinamicos_json.items():
-                    st.markdown(f"**{key}:** {val}")
-                st.markdown(f"**Notas del Grupo:** {p_data['notas']}")
-                
-                # Cargar Archivos Subidos
-                archivos = pd.read_sql(f"SELECT nombre_archivo, tipo_archivo, datos FROM archivos_subidos WHERE id_persona = {id_persona}", conn)
-                if not archivos.empty:
-                    st.markdown("#### 📁 Archivos Adjuntos")
-                    for _, archivo in archivos.iterrows():
-                        st.download_button(label=f"Descargar {archivo['nombre_archivo']}", data=archivo['datos'], file_name=archivo['nombre_archivo'], mime=archivo['tipo_archivo'])
+            # --- ZONA DE ELIMINACIÓN (Visible siempre que haya 1 o más seleccionados) ---
+            st.error(f"⚠️ Has seleccionado {len(ids_seleccionados)} persona(s).")
+            if st.button("🗑️ Eliminar Seleccionados", type="primary"):
+                cursor = conn.cursor()
+                placeholders = ','.join('?' for _ in ids_seleccionados)
+                # Borrar archivos asociados
+                cursor.execute(f"DELETE FROM archivos_subidos WHERE id_persona IN ({placeholders})", ids_seleccionados)
+                # Borrar personas
+                cursor.execute(f"DELETE FROM registros_personas WHERE id IN ({placeholders})", ids_seleccionados)
+                conn.commit()
+                st.success("¡Registros eliminados correctamente!")
+                st.rerun()
 
-            else:
-                # --- MODO EDICIÓN ACTIVO ---
-                st.warning("Estás en Modo Edición. Guarda los cambios al terminar.")
-                with st.form(f"form_edit_{id_persona}"):
-                    nuevo_nombre = st.text_input("Nombre:", value=p_data['nombre'])
-                    nuevo_estado = st.selectbox("Estado Trámite:", ["Recibido", "En proceso", "Finalizado", "Rechazado"], index=["Recibido", "En proceso", "Finalizado", "Rechazado"].index(p_data['estado_tramite']))
+            # --- MODO DETALLE/EDICIÓN (Visible SOLO si hay exactamente 1 seleccionado) ---
+            if len(ids_seleccionados) == 1:
+                id_persona = ids_seleccionados[0]
+                p_data = pd.read_sql(f"SELECT p.*, g.* FROM registros_personas p JOIN registros_grupo g ON p.id_grupo = g.id_grupo WHERE p.id = {id_persona}", conn).iloc[0]
+                dinamicos_json = json.loads(p_data['datos_dinamicos'])
+                
+                st.divider()
+                colA, colB = st.columns([9, 1])
+                colA.subheader(f"📋 Detalles de: {p_data['nombre']}")
+                
+                if colB.button("✏️ Editar", type="secondary"):
+                    st.session_state[f"editando_{id_persona}"] = not st.session_state.get(f"editando_{id_persona}", False)
+                
+                edit_mode = st.session_state.get(f"editando_{id_persona}", False)
+                
+                if not edit_mode:
+                    col1, col2 = st.columns(2)
+                    col1.markdown(f"**Trámite:** {p_data['tipo_tramite']} - {p_data['estado_tramite']}")
+                    col1.markdown(f"**Monto:** {p_data['monto']} ({p_data['estado_pago']})")
+                    col2.markdown(f"**Rol:** {'Titular' if p_data['es_titular']==1 else 'Adicional'}")
+                    if p_data['documentos']: col2.markdown(f"**Docs Físicos:** {p_data['documentos']}")
                     
-                    nuevos_dinamicos = {}
+                    st.markdown("#### Datos de la Casilla")
                     for key, val in dinamicos_json.items():
-                        if key == "Tipo de certificado":
-                            opciones = ["Antecedentes", "Nacimiento"]
-                            idx = opciones.index(val) if val in opciones else 0
-                            nuevos_dinamicos[key] = st.selectbox("Tipo de certificado:", opciones, index=idx)
-                        else:
-                            nuevos_dinamicos[key] = st.text_input(f"{key}:", value=val)
+                        st.markdown(f"**{key}:** {val}")
+                    st.markdown(f"**Notas del Grupo:** {p_data['notas']}")
                     
-                    if st.form_submit_button("💾 Guardar Cambios"):
-                        cursor = conn.cursor()
-                        cursor.execute("UPDATE registros_personas SET nombre=?, datos_dinamicos=? WHERE id=?", (nuevo_nombre, json.dumps(nuevos_dinamicos), id_persona))
-                        cursor.execute("UPDATE registros_grupo SET estado_tramite=? WHERE id_grupo=?", (nuevo_estado, p_data['id_grupo']))
-                        conn.commit()
-                        st.session_state[f"editando_{id_persona}"] = False
-                        st.success("Cambios guardados.")
-                        st.rerun()
+                    archivos = pd.read_sql(f"SELECT nombre_archivo, tipo_archivo, datos FROM archivos_subidos WHERE id_persona = {id_persona}", conn)
+                    if not archivos.empty:
+                        st.markdown("#### 📁 Archivos Adjuntos")
+                        for _, archivo in archivos.iterrows():
+                            st.download_button(label=f"Descargar {archivo['nombre_archivo']}", data=archivo['datos'], file_name=archivo['nombre_archivo'], mime=archivo['tipo_archivo'])
+                else:
+                    st.warning("Estás en Modo Edición. Guarda los cambios al terminar.")
+                    with st.form(f"form_edit_{id_persona}"):
+                        nuevo_nombre = st.text_input("Nombre:", value=p_data['nombre'])
+                        nuevo_estado = st.selectbox("Estado Trámite:", ["Recibido", "En proceso", "Finalizado", "Rechazado"], index=["Recibido", "En proceso", "Finalizado", "Rechazado"].index(p_data['estado_tramite']))
+                        
+                        nuevos_dinamicos = {}
+                        for key, val in dinamicos_json.items():
+                            if key == "Tipo de certificado":
+                                opciones = ["Antecedentes", "Nacimiento"]
+                                idx = opciones.index(val) if val in opciones else 0
+                                nuevos_dinamicos[key] = st.selectbox("Tipo de certificado:", opciones, index=idx)
+                            else:
+                                nuevos_dinamicos[key] = st.text_input(f"{key}:", value=val)
+                        
+                        if st.form_submit_button("💾 Guardar Cambios"):
+                            cursor = conn.cursor()
+                            cursor.execute("UPDATE registros_personas SET nombre=?, datos_dinamicos=? WHERE id=?", (nuevo_nombre, json.dumps(nuevos_dinamicos), id_persona))
+                            cursor.execute("UPDATE registros_grupo SET estado_tramite=? WHERE id_grupo=?", (nuevo_estado, p_data['id_grupo']))
+                            conn.commit()
+                            st.session_state[f"editando_{id_persona}"] = False
+                            st.success("Cambios guardados.")
+                            st.rerun()
     conn.close()
 
 elif menu == "📊 Exportar a Excel":
