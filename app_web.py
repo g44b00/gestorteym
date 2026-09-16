@@ -4,7 +4,7 @@ import pandas as pd
 import json
 import uuid
 from datetime import datetime
-import io 
+import io
 
 # --- CONFIGURACIÓN VISUAL ---
 st.set_page_config(page_title="Gestor de Trámites", page_icon="📄", layout="wide")
@@ -16,7 +16,7 @@ estilos_css = """
     [data-testid="stSidebar"] .stRadio label p { font-size: 24px !important; }
     [data-testid="stSidebar"] .stRadio label:hover { transform: scale(1.06) translateX(15px) !important; background-color: rgba(52, 152, 219, 0.15) !important; color: #3498DB !important; box-shadow: -2px 4px 15px rgba(0,0,0,0.1) !important; }
     
-    /* Textos Generales y Controles */
+    /* Textos y Controles */
     label, .stSelectbox label, .stTextInput label, .stTextArea label, p { font-size: 20px !important; font-weight: 600 !important; }
     .stTextInput, .stSelectbox, .stTextArea { max-width: 650px !important; }
     .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] { font-size: 18px !important; padding: 10px 14px !important; border-radius: 8px !important; }
@@ -26,14 +26,7 @@ estilos_css = """
     .stButton > button:hover { transform: translateY(-3px) scale(1.02) !important; box-shadow: 0px 5px 15px rgba(0,0,0,0.15) !important; }
     
     /* Tarjetas del Dashboard */
-    .metric-card {
-        background-color: #f8f9fa;
-        border-left: 6px solid #3498DB;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0px 4px 6px rgba(0,0,0,0.05);
-        margin-bottom: 20px;
-    }
+    .metric-card { background-color: #f8f9fa; border-left: 6px solid #3498DB; padding: 20px; border-radius: 10px; box-shadow: 0px 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
     .metric-card h3 { margin: 0; color: #7f8c8d; font-size: 18px; }
     .metric-card h2 { margin: 5px 0 0 0; color: #2c3e50; font-size: 36px; }
 </style>
@@ -73,7 +66,9 @@ def init_db():
     cursor.execute('''CREATE TABLE IF NOT EXISTS config_tramites (nombre TEXT PRIMARY KEY, campos JSON)''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS registros_grupo (id_grupo TEXT PRIMARY KEY, tipo_tramite TEXT, fecha TEXT, monto TEXT, estado_tramite TEXT, estado_pago TEXT, notas TEXT)''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS registros_personas (id INTEGER PRIMARY KEY AUTOINCREMENT, id_grupo TEXT, es_titular INTEGER, nombre TEXT, datos_dinamicos JSON, documentos TEXT)''')
-    cursor.execute('''CREATE TABLE IF NOT EXISTS archivos_subidos (id INTEGER PRIMARY KEY AUTOINCREMENT, id_persona INTEGER, nombre_archivo TEXT, tipo_archivo TEXT, datos BLOB)''')
+    
+    # Tabla de archivos con fecha de subida para el limpiador
+    cursor.execute('''CREATE TABLE IF NOT EXISTS archivos_subidos (id INTEGER PRIMARY KEY AUTOINCREMENT, id_persona INTEGER, nombre_archivo TEXT, tipo_archivo TEXT, datos BLOB, fecha_subida DATE)''')
     
     cursor.execute("SELECT count(*) FROM config_tramites")
     if cursor.fetchone()[0] == 0:
@@ -95,46 +90,28 @@ menu = st.sidebar.radio("Navegación", ["🏠 Dashboard Inicial", "📝 Nuevo Re
 if menu == "🏠 Dashboard Inicial":
     st.title("🏠 Panel de Control")
     conn = get_db_connection()
+    df_dashboard = pd.read_sql("SELECT monto, estado_pago, tipo_tramite FROM registros_grupo", conn)
     
-    # Cálculos para el Dashboard
-    df_dashboard = pd.read_sql("SELECT monto, estado_pago, tipo_tramite, fecha FROM registros_grupo", conn)
-    
-    # Limpiar montos (quitar el signo $ y puntos para poder sumar matemáticamente)
     def limpiar_monto(valor):
-        try:
-            return int(str(valor).replace('$', '').replace('.', '').replace(' ', '').strip())
-        except:
-            return 0
+        try: return int(str(valor).replace('$', '').replace('.', '').replace(' ', '').strip())
+        except: return 0
             
     if not df_dashboard.empty:
         df_dashboard['monto_num'] = df_dashboard['monto'].apply(limpiar_monto)
-        
         ingresos_totales = df_dashboard[df_dashboard['estado_pago'] == 'Pagado']['monto_num'].sum()
         dinero_pendiente = df_dashboard[df_dashboard['estado_pago'] == 'Pendiente']['monto_num'].sum()
         total_tramites = len(df_dashboard)
         
-        # Formatear números como CLP
-        formato_ingreso = f"${ingresos_totales:,.0f}".replace(",", ".")
-        formato_pendiente = f"${dinero_pendiente:,.0f}".replace(",", ".")
-        
-        # Mostrar Tarjetas (Cards)
         col1, col2, col3 = st.columns(3)
-        with col1:
-            st.markdown(f"<div class='metric-card'><h3>💰 Ingresos Pagados</h3><h2>{formato_ingreso}</h2></div>", unsafe_allow_html=True)
-        with col2:
-            st.markdown(f"<div class='metric-card' style='border-left-color: #E74C3C;'><h3>⏳ Dinero Pendiente</h3><h2>{formato_pendiente}</h2></div>", unsafe_allow_html=True)
-        with col3:
-            st.markdown(f"<div class='metric-card' style='border-left-color: #2ECC71;'><h3>📄 Total Trámites</h3><h2>{total_tramites}</h2></div>", unsafe_allow_html=True)
+        with col1: st.markdown(f"<div class='metric-card'><h3>💰 Ingresos Pagados</h3><h2>${ingresos_totales:,.0f}</h2></div>".replace(",", "."), unsafe_allow_html=True)
+        with col2: st.markdown(f"<div class='metric-card' style='border-left-color: #E74C3C;'><h3>⏳ Dinero Pendiente</h3><h2>${dinero_pendiente:,.0f}</h2></div>".replace(",", "."), unsafe_allow_html=True)
+        with col3: st.markdown(f"<div class='metric-card' style='border-left-color: #2ECC71;'><h3>📄 Total Trámites</h3><h2>{total_tramites}</h2></div>", unsafe_allow_html=True)
         
         st.divider()
-        
-        # Gráfico simple de Trámites
         st.subheader("Distribución de Trámites")
-        conteo_tramites = df_dashboard['tipo_tramite'].value_counts()
-        st.bar_chart(conteo_tramites, use_container_width=True)
-        
+        st.bar_chart(df_dashboard['tipo_tramite'].value_counts(), use_container_width=True)
     else:
-        st.info("Aún no hay trámites registrados. El panel de control se poblará cuando agregues datos.")
+        st.info("Aún no hay trámites registrados.")
     conn.close()
 
 elif menu == "⚙️ Configuración":
@@ -149,7 +126,7 @@ elif menu == "⚙️ Configuración":
                 cursor = conn.cursor()
                 cursor.execute("INSERT INTO config_tramites VALUES (?, ?)", (nuevo_tramite_nombre, "[]"))
                 conn.commit()
-                st.success(f"Trámite '{nuevo_tramite_nombre}' creado con éxito.")
+                st.success(f"Trámite '{nuevo_tramite_nombre}' creado.")
                 st.rerun()
             except sqlite3.IntegrityError:
                 st.error("Ese trámite ya existe.")
@@ -159,14 +136,14 @@ elif menu == "⚙️ Configuración":
     st.subheader("2. Modificar Casillas de un Trámite")
     df_tramites = pd.read_sql("SELECT * FROM config_tramites", conn)
     if not df_tramites.empty:
-        tramite_sel = st.selectbox("Selecciona el trámite a modificar:", df_tramites['nombre'].tolist())
+        tramite_sel = st.selectbox("Selecciona el trámite:", df_tramites['nombre'].tolist())
         campos_actuales = json.loads(df_tramites[df_tramites['nombre'] == tramite_sel]['campos'].values[0])
         
-        st.write("Casillas actuales (Haz clic en 🗑️ para eliminar):")
+        st.write("Casillas actuales:")
         for campo in campos_actuales:
             col1, col2 = st.columns([4, 1])
             col1.markdown(f"- {campo}")
-            if col2.button("🗑️ Eliminar", key=f"del_{tramite_sel}_{campo}"):
+            if col2.button("🗑️", key=f"del_{tramite_sel}_{campo}"):
                 campos_actuales.remove(campo)
                 cursor = conn.cursor()
                 cursor.execute("UPDATE config_tramites SET campos=? WHERE nombre=?", (json.dumps(campos_actuales), tramite_sel))
@@ -181,6 +158,25 @@ elif menu == "⚙️ Configuración":
                 cursor.execute("UPDATE config_tramites SET campos=? WHERE nombre=?", (json.dumps(campos_actuales), tramite_sel))
                 conn.commit()
                 st.rerun()
+                
+    st.divider()
+    
+    st.subheader("🧹 Limpiador de Espacio (Borrar Archivos Antiguos)")
+    st.write("Esta herramienta borrará **SÓLO las fotos y PDFs** subidos en el rango de fechas que elijas. Los datos personales y el historial **NO se borrarán**.")
+    
+    colA, colB = st.columns(2)
+    with colA: fecha_inicio = st.date_input("Desde la fecha:")
+    with colB: fecha_fin = st.date_input("Hasta la fecha:")
+    
+    if st.button("🚨 Borrar Archivos en este Rango", type="primary"):
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM archivos_subidos WHERE fecha_subida BETWEEN ? AND ?", (fecha_inicio, fecha_fin))
+        filas_borradas = cursor.rowcount
+        conn.commit()
+        if filas_borradas > 0:
+            st.success(f"¡Limpieza exitosa! Se eliminaron {filas_borradas} archivos pesados de la base de datos.")
+        else:
+            st.info("No se encontraron archivos en ese rango de fechas.")
     conn.close()
 
 elif menu == "📝 Nuevo Registro":
@@ -188,28 +184,22 @@ elif menu == "📝 Nuevo Registro":
     conn = get_db_connection()
     tramites_disp = pd.read_sql("SELECT nombre, campos FROM config_tramites", conn)
     
-    if tramites_disp.empty:
-        st.warning("No hay trámites configurados.")
-    else:
-        tipo_tramite = st.selectbox("Selecciona el tipo de trámite:", tramites_disp['nombre'].tolist())
+    if not tramites_disp.empty:
+        tipo_tramite = st.selectbox("Selecciona el trámite:", tramites_disp['nombre'].tolist())
         campos_json = tramites_disp[tramites_disp['nombre'] == tipo_tramite]['campos'].values[0]
         campos_dinamicos = json.loads(campos_json)
         
         col1, col2 = st.columns([1, 2])
         
         with col1:
-            st.subheader("Datos del Grupo")
             monto = st.text_input("Monto Total (CLP):", placeholder="Ej: 50000")
             estado_t = st.selectbox("Estado del Trámite:", ["Recibido", "En proceso", "Finalizado", "Rechazado"])
             estado_p = st.selectbox("Estado de Pago:", ["Pendiente", "Pagado"])
             notas = st.text_area("Notas / Observaciones:", height=150)
-            st.divider()
             num_personas = st.slider("¿Cuántas personas incluye?", 1, 5, 1)
         
         with col2:
-            st.subheader("Personas y Archivos")
             datos_personas = []
-            
             with st.form("form_registro", clear_on_submit=True):
                 for i in range(num_personas):
                     es_titular = (i == 0)
@@ -227,20 +217,20 @@ elif menu == "📝 Nuevo Registro":
                     
                     docs = ""
                     if tipo_tramite != "Legalización":
-                        docs = st.text_area(f"Documentos Físicos Recibidos:", value="Ninguno", key=f"doc_{i}")
+                        docs = st.text_area(f"Documentos Físicos:", value="Ninguno", key=f"doc_{i}")
                     
-                    archivos = st.file_uploader(f"Subir archivos (PDF, JPG, PNG)", type=["pdf", "png", "jpg"], accept_multiple_files=True, key=f"file_{i}")
+                    archivos = st.file_uploader(f"Subir archivos (PDF, PNG, JPG)", type=["pdf", "png", "jpg"], accept_multiple_files=True, key=f"file_{i}")
                     datos_personas.append({"es_titular": 1 if es_titular else 0, "nombre": nombre, "dinamicos": dinamicos, "documentos": docs, "archivos": archivos})
                     st.divider()
                     
-                submit_btn = st.form_submit_button("Guardar Trámite Completo", type="primary")
-                
-                if submit_btn:
+                if st.form_submit_button("Guardar Trámite", type="primary"):
                     if not datos_personas[0]["nombre"].strip():
                         st.error("El nombre del Titular es obligatorio.")
                     else:
                         id_grupo = str(uuid.uuid4())[:8]
                         fecha_actual = datetime.now().strftime("%d/%m/%Y")
+                        fecha_subida_iso = datetime.now().strftime("%Y-%m-%d") 
+                        
                         cursor = conn.cursor()
                         cursor.execute('''INSERT INTO registros_grupo (id_grupo, tipo_tramite, fecha, monto, estado_tramite, estado_pago, notas) VALUES (?, ?, ?, ?, ?, ?, ?)''', (id_grupo, tipo_tramite, fecha_actual, monto, estado_t, estado_p, notas))
                         
@@ -250,14 +240,13 @@ elif menu == "📝 Nuevo Registro":
                                 person_id = cursor.lastrowid
                                 if p["archivos"]:
                                     for arch in p["archivos"]:
-                                        cursor.execute("INSERT INTO archivos_subidos (id_persona, nombre_archivo, tipo_archivo, datos) VALUES (?, ?, ?, ?)", (person_id, arch.name, arch.type, arch.read()))
+                                        cursor.execute("INSERT INTO archivos_subidos (id_persona, nombre_archivo, tipo_archivo, datos, fecha_subida) VALUES (?, ?, ?, ?, ?)", (person_id, arch.name, arch.type, arch.read(), fecha_subida_iso))
                         conn.commit()
-                        st.success("¡Registro guardado con archivos en la nube!")
+                        st.success("¡Registro guardado exitosamente!")
     conn.close()
 
 elif menu == "🔍 Buscar / Editar":
     st.title("🔍 Buscador de Trámites")
-    st.write("Selecciona una o varias filas usando las casillas de la izquierda.")
     conn = get_db_connection()
     
     query = '''SELECT p.id, p.nombre as Nombre, g.tipo_tramite as Trámite, g.fecha as Fecha, g.monto as Monto, g.estado_pago as Pago, p.datos_dinamicos FROM registros_personas p JOIN registros_grupo g ON p.id_grupo = g.id_grupo'''
@@ -266,15 +255,34 @@ elif menu == "🔍 Buscar / Editar":
     if not df_busqueda.empty:
         df_busqueda['Tipo de Certificado'] = df_busqueda['datos_dinamicos'].apply(lambda x: json.loads(x).get('Tipo de certificado', '-') if pd.notnull(x) else '-')
         
-        # APLICAR INSIGNIAS (EMOJIS/COLORES) A LA COLUMNA PAGO
         def formato_pago(val):
-            if val == "Pagado":
-                return "✅ Pagado"
-            return "🔴 Pendiente"
-            
+            return "✅ Pagado" if val == "Pagado" else "🔴 Pendiente"
         df_busqueda['Pago'] = df_busqueda['Pago'].apply(formato_pago)
         
-        buscar = st.text_input("🔎 Buscar por nombre:")
+        # --- FILTROS RÁPIDOS (CON "DE HOY") ---
+        st.write("**Filtros Rápidos:**")
+        colF1, colF2, colF3, colF4, colF5 = st.columns(5)
+        filtro_rapido = "Todos"
+        
+        if colF1.button("📋 Todos", use_container_width=True): filtro_rapido = "Todos"
+        if colF2.button("📅 De Hoy", use_container_width=True): filtro_rapido = "Hoy"
+        if colF3.button("🔴 Deudores", use_container_width=True): filtro_rapido = "Deudores"
+        if colF4.button("⚖️ Legalización", use_container_width=True): filtro_rapido = "Legalización"
+        if colF5.button("🏠 Residencia", use_container_width=True): filtro_rapido = "Residencia"
+        
+        if filtro_rapido == "Hoy":
+            fecha_hoy = datetime.now().strftime("%d/%m/%Y")
+            df_busqueda = df_busqueda[df_busqueda['Fecha'] == fecha_hoy]
+        elif filtro_rapido == "Deudores":
+            df_busqueda = df_busqueda[df_busqueda['Pago'] == "🔴 Pendiente"]
+        elif filtro_rapido == "Legalización":
+            df_busqueda = df_busqueda[df_busqueda['Trámite'] == "Legalización"]
+        elif filtro_rapido == "Residencia":
+            df_busqueda = df_busqueda[df_busqueda['Trámite'].str.contains("Residencia", na=False)]
+            
+        st.divider()
+        
+        buscar = st.text_input("🔎 Buscar por nombre:", placeholder="Escribe un nombre...")
         if buscar:
             df_busqueda = df_busqueda[df_busqueda['Nombre'].str.contains(buscar, case=False, na=False)]
         
@@ -296,7 +304,7 @@ elif menu == "🔍 Buscar / Editar":
                 cursor.execute(f"DELETE FROM archivos_subidos WHERE id_persona IN ({placeholders})", ids_seleccionados)
                 cursor.execute(f"DELETE FROM registros_personas WHERE id IN ({placeholders})", ids_seleccionados)
                 conn.commit()
-                st.success("¡Registros eliminados correctamente!")
+                st.success("¡Registros eliminados!")
                 st.rerun()
 
             if len(ids_seleccionados) == 1:
@@ -321,47 +329,61 @@ elif menu == "🔍 Buscar / Editar":
                     if p_data['documentos']: col2.markdown(f"**Docs Físicos:** {p_data['documentos']}")
                     
                     st.markdown("#### Datos de la Casilla")
-                    for key, val in dinamicos_json.items():
-                        st.markdown(f"**{key}:** {val}")
+                    for key, val in dinamicos_json.items(): st.markdown(f"**{key}:** {val}")
                     st.markdown(f"**Notas del Grupo:** {p_data['notas']}")
                     
-                 # --- FASE 2: VISOR INTELIGENTE (TAMAÑO COMPACTO) ---
+                    # --- VISOR INTELIGENTE (TAMAÑO COMPACTO) ---
                     archivos = pd.read_sql(f"SELECT nombre_archivo, tipo_archivo, datos FROM archivos_subidos WHERE id_persona = {id_persona}", conn)
                     if not archivos.empty:
                         st.markdown("#### 📁 Archivos Adjuntos")
-                        
-                        imagenes = []
-                        otros_archivos = []
-                        
+                        imagenes, otros_archivos = [], []
                         for _, archivo in archivos.iterrows():
-                            if "image" in archivo['tipo_archivo']:
-                                imagenes.append(archivo)
-                            else:
-                                otros_archivos.append(archivo)
+                            if "image" in archivo['tipo_archivo']: imagenes.append(archivo)
+                            else: otros_archivos.append(archivo)
                         
-                        # 1. Documentos y PDFs (Solo botones de descarga)
                         if otros_archivos:
                             st.write("📄 Documentos:")
                             for idx, archivo in enumerate(otros_archivos):
                                 st.download_button(label=f"Descargar {archivo['nombre_archivo']}", data=archivo['datos'], file_name=archivo['nombre_archivo'], mime=archivo['tipo_archivo'], key=f"dl_pdf_{id_persona}_{idx}")
                         
-                        # 2. Galería de Imágenes (Tamaño pequeño)
                         if imagenes:
                             st.write("🖼️ Galería Visual:")
-                            cols = st.columns(min(len(imagenes), 4)) # Ahora caben 4 fotos pequeñas por fila
+                            cols = st.columns(min(len(imagenes), 4))
                             for idx, img in enumerate(imagenes):
                                 with cols[idx % 4]:
                                     try:
                                         foto_virtual = io.BytesIO(img['datos'])
-                                        # Aquí limitamos el ancho de la imagen a 200 píxeles para que no sea gigante
                                         st.image(foto_virtual, caption=img['nombre_archivo'], width=200)
                                     except Exception:
                                         st.error("Error al mostrar la imagen.")
-                                        
                                     st.download_button(label="📥 Descargar Foto", data=img['datos'], file_name=img['nombre_archivo'], mime=img['tipo_archivo'], key=f"dl_img_{id_persona}_{idx}")
+                else:
+                    st.warning("Modo Edición.")
+                    with st.form(f"form_edit_{id_persona}"):
+                        nuevo_nombre = st.text_input("Nombre:", value=p_data['nombre'])
+                        nuevo_estado = st.selectbox("Estado Trámite:", ["Recibido", "En proceso", "Finalizado", "Rechazado"], index=["Recibido", "En proceso", "Finalizado", "Rechazado"].index(p_data['estado_tramite']))
+                        nuevo_pago = st.selectbox("Estado Pago:", ["Pendiente", "Pagado"], index=["Pendiente", "Pagado"].index(p_data['estado_pago']))
+                        
+                        nuevos_dinamicos = {}
+                        for key, val in dinamicos_json.items():
+                            if key == "Tipo de certificado":
+                                opciones = ["Antecedentes", "Nacimiento"]
+                                idx = opciones.index(val) if val in opciones else 0
+                                nuevos_dinamicos[key] = st.selectbox("Tipo de certificado:", opciones, index=idx)
+                            else: nuevos_dinamicos[key] = st.text_input(f"{key}:", value=val)
+                        
+                        if st.form_submit_button("💾 Guardar Cambios"):
+                            cursor = conn.cursor()
+                            cursor.execute("UPDATE registros_personas SET nombre=?, datos_dinamicos=? WHERE id=?", (nuevo_nombre, json.dumps(nuevos_dinamicos), id_persona))
+                            cursor.execute("UPDATE registros_grupo SET estado_tramite=?, estado_pago=? WHERE id_grupo=?", (nuevo_estado, nuevo_pago, p_data['id_grupo']))
+                            conn.commit()
+                            st.session_state[f"editando_{id_persona}"] = False
+                            st.success("Cambios guardados.")
+                            st.rerun()
+    conn.close()
 
 elif menu == "📊 Exportar a Excel":
-    st.title("📊 Exportar Datos a Excel (CSV)")
+    st.title("📊 Exportar Datos a Excel")
     conn = get_db_connection()
     df_export = pd.read_sql("SELECT g.id_grupo, g.tipo_tramite, g.fecha, g.monto, g.estado_tramite, g.estado_pago, g.notas, p.es_titular, p.nombre, p.datos_dinamicos, p.documentos FROM registros_personas p JOIN registros_grupo g ON p.id_grupo = g.id_grupo", conn)
     conn.close()
@@ -378,4 +400,4 @@ elif menu == "📊 Exportar a Excel":
             
         df_limpio = pd.DataFrame(lista_final)
         csv = df_limpio.to_csv(index=False, sep=";").encode('utf-8-sig')
-        st.download_button(label="📥 Descargar Base de Datos Completa", data=csv, file_name=f"Reporte_Tramites_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv", type="primary")
+        st.download_button(label="📥 Descargar Base de Datos", data=csv, file_name=f"Reporte_Tramites_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv", type="primary")
