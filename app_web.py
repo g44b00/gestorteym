@@ -18,7 +18,7 @@ estilos_css = """
     
     /* Textos y Controles */
     label, .stSelectbox label, .stTextInput label, .stTextArea label, p { font-size: 20px !important; font-weight: 600 !important; }
-    .stTextInput, .stSelectbox, .stTextArea { max-width: 650px !important; }
+    .stTextInput, .stSelectbox, .stTextArea, .stMultiSelect { max-width: 650px !important; }
     .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] { font-size: 18px !important; padding: 10px 14px !important; border-radius: 8px !important; }
     
     /* Botones */
@@ -36,7 +36,7 @@ st.markdown(estilos_css, unsafe_allow_html=True)
 # --- 1. SEGURIDAD ---
 def check_password():
     def password_entered():
-        if st.session_state["password"] == "Local2014": 
+        if st.session_state["password"] == "MisTramites2026": 
             st.session_state["password_correct"] = True
             del st.session_state["password"]
         else:
@@ -66,8 +66,6 @@ def init_db():
     cursor.execute('''CREATE TABLE IF NOT EXISTS config_tramites (nombre TEXT PRIMARY KEY, campos JSON)''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS registros_grupo (id_grupo TEXT PRIMARY KEY, tipo_tramite TEXT, fecha TEXT, monto TEXT, estado_tramite TEXT, estado_pago TEXT, notas TEXT)''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS registros_personas (id INTEGER PRIMARY KEY AUTOINCREMENT, id_grupo TEXT, es_titular INTEGER, nombre TEXT, datos_dinamicos JSON, documentos TEXT)''')
-    
-    # Tabla de archivos con fecha de subida para el limpiador
     cursor.execute('''CREATE TABLE IF NOT EXISTS archivos_subidos (id INTEGER PRIMARY KEY AUTOINCREMENT, id_persona INTEGER, nombre_archivo TEXT, tipo_archivo TEXT, datos BLOB, fecha_subida DATE)''')
     
     cursor.execute("SELECT count(*) FROM config_tramites")
@@ -282,31 +280,43 @@ elif menu == "🔍 Buscar / Editar":
             
         st.divider()
         
-        buscar = st.text_input("🔎 Buscar por nombre:", placeholder="Escribe un nombre...")
+        buscar = st.text_input("🔎 Filtrar por nombre:", placeholder="Escribe un nombre...")
         if buscar:
             df_busqueda = df_busqueda[df_busqueda['Nombre'].str.contains(buscar, case=False, na=False)]
         
+        # VISUALIZACIÓN DE LA TABLA (MÁS COMPATIBLE PARA WINDOWS 7)
+        # Quitamos el parámetro 'on_select' para que funcione en cualquier computadora
         columnas_mostrar = ['Nombre', 'Tipo de Certificado', 'Trámite', 'Fecha', 'Monto', 'Pago']
         df_mostrar = df_busqueda[['id'] + columnas_mostrar]
+        st.dataframe(df_mostrar, hide_index=True, use_container_width=True)
         
-        event = st.dataframe(df_mostrar, column_config={"id": None}, on_select="rerun", selection_mode="multi-row", use_container_width=True, hide_index=True)
+        st.divider()
         
-        if event.selection.rows:
-            filas_seleccionadas = event.selection.rows
-            ids_seleccionados = [int(df_mostrar.iloc[i]['id']) for i in filas_seleccionadas]
+        # --- NUEVO MÉTODO DE SELECCIÓN COMPATIBLE ---
+        st.subheader("🛠️ Acciones: Ver Detalles, Editar o Eliminar")
+        # Creamos una lista combinando ID y Nombre para el menú desplegable
+        df_mostrar['ID_Nombre'] = df_mostrar['id'].astype(str) + " | " + df_mostrar['Nombre'] + " | " + df_mostrar['Trámite']
+        opciones_lista = df_mostrar['ID_Nombre'].tolist()
+        
+        seleccionados = st.multiselect("📌 Selecciona uno o varios registros de la lista:", opciones_lista, placeholder="Haz clic aquí para seleccionar...")
+        
+        if seleccionados:
+            # Extraemos solo los números de ID de la selección
+            ids_seleccionados = [int(sel.split(" | ")[0]) for sel in seleccionados]
             
-            st.divider()
-            
-            st.error(f"⚠️ Has seleccionado {len(ids_seleccionados)} persona(s).")
-            if st.button("🗑️ Eliminar Seleccionados", type="primary"):
-                cursor = conn.cursor()
-                placeholders = ','.join('?' for _ in ids_seleccionados)
-                cursor.execute(f"DELETE FROM archivos_subidos WHERE id_persona IN ({placeholders})", ids_seleccionados)
-                cursor.execute(f"DELETE FROM registros_personas WHERE id IN ({placeholders})", ids_seleccionados)
-                conn.commit()
-                st.success("¡Registros eliminados!")
-                st.rerun()
+            # --- VENTANA PEQUEÑA Y DISCRETA DE CONFIRMACIÓN PARA BORRAR ---
+            with st.popover("🗑️ Eliminar registros seleccionados"):
+                st.warning(f"¿Estás seguro de que deseas eliminar {len(ids_seleccionados)} registro(s)?")
+                if st.button("Sí, confirmar y borrar", type="primary"):
+                    cursor = conn.cursor()
+                    placeholders = ','.join('?' for _ in ids_seleccionados)
+                    cursor.execute(f"DELETE FROM archivos_subidos WHERE id_persona IN ({placeholders})", ids_seleccionados)
+                    cursor.execute(f"DELETE FROM registros_personas WHERE id IN ({placeholders})", ids_seleccionados)
+                    conn.commit()
+                    st.success("¡Registros eliminados!")
+                    st.rerun()
 
+            # --- SI SOLO SELECCIONA A 1 PERSONA, MOSTRAMOS EL LÁPIZ Y SUS DETALLES ---
             if len(ids_seleccionados) == 1:
                 id_persona = ids_seleccionados[0]
                 p_data = pd.read_sql(f"SELECT p.*, g.* FROM registros_personas p JOIN registros_grupo g ON p.id_grupo = g.id_grupo WHERE p.id = {id_persona}", conn).iloc[0]
